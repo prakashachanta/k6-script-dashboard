@@ -218,7 +218,8 @@ function Webk6() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
     <div className="max-w-md w-full space-y-8">
-      <form onSubmit={handleSubmit} className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4">
+    <form onSubmit={handleSubmit} className="bg-white shadow-md rounded px-8 pt-6 pb-8 mb-4 relative">
+  
       <h2 className="text-2xl font-bold mb-4 text-[#0072E4]">Load Test Parameters - WEB</h2>
 
         <div className="mb-4">
