@@ -7,7 +7,7 @@ function Webk6() {
   const [numUsers, setNumUsers] = useState('');
   const [duration, setDuration] = useState('');
   const[iterations,setIterations]= useState('');
-  const[statTime, setstatTime]=useState('');
+  const [gracefulRampDown,setgracefulRampdown]=useState('');
   const [startVUs,setStartVus]=useState('');
   const [startRate,setStartRate]= useState('');
   const [rate,setRate]= useState('');
@@ -32,14 +32,12 @@ function Webk6() {
       !url ||
       (option === 'LOAD' && (numUsers < 1 || duration <= '0')) ||
       (option === 'RAMP' && stages.some(item => !item.dur || !item.target)) ||
-      (option === 'SHARED-Iterations' && (numUsers <=1 ||  iterations <= 0 || statTime<='0')) ||
+      (option === 'SHARED-Iterations' && (numUsers <=1 ||  iterations <= 0 )) ||
       (option === 'Per-Vu-Iterations' && (numUsers <=1 ||  iterations <= 0 || duration<='0')) ||
       (option === 'Constant-vus' && (numUsers <=1 || duration<='0')) ||
       (option === 'Ramping-vus' && (startVUs <=1 ||  stages.some(item => !item.dur || !item.target))) ||
       (option === 'Constant-arrival-rate' && (rate <=1 || duration<='0' || timeUnit<=0|| preAllocatedvus<=0 || maxVus<=0)) ||
-      (option === 'Ramping-arrival-rate' && (startRate <=1 || timeUnit<=0|| preAllocatedvus<=0|| maxVus<=0|| stages.some(item => !item.dur || !item.target))) ||
-      (option === 'Externally-Controlled' && (numUsers <=1 ||maxVus<=0|| duration<='0')) ||
-      !threshold
+      (option === 'Ramping-arrival-rate' && (startRate <=1 || timeUnit<=0|| preAllocatedvus<=0|| maxVus<=0|| stages.some(item => !item.dur || !item.target)))
     ) {
       alert('Please fill in all the mandatory fields');
       return;
@@ -73,79 +71,87 @@ function Webk6() {
     }else if(option==='SHARED-Iterations'){
         k6Script+=`
         scenarios:{
-            executor: 'shared-iterations',
-            vus: ${numUsers},
-            iterations: ${iterations},
-            statTime: '${statTime}s'
-        },`
+            shared_iterations: {
+                executor: 'shared-iterations',
+                vus: ${numUsers},
+                iterations: ${iterations},
+                maxDuration: '${duration}s'
+            }
+        }
+            ,`
     }else if(option==='Per-Vu-iterations'){
         k6Script+=`
         scenarios:{
-            executor: 'per-vu-iterations',
-            vus: ${numUsers},
-            iterations: ${iterations},
-            maxDuration: '${duration}s'
+            per_vu_iterations: {
+                executor: 'per-vu-iterations',
+                vus: ${numUsers},
+                iterations: ${iterations},
+                maxDuration: '${duration}s'
+            }
         },`
     }else if(option==='Constant-vus'){
         k6Script+=`
         scenarios:{
-            executor: 'constant-vus',
+            constant_vus{
+                executor: 'constant-vus',
             vus: ${numUsers},
             duration: '${duration}s'
+            }  
         },`
     }else if(option==='Ramping-vus'){
-        k6Script+=`{
+        k6Script += `
             scenarios:{
+              ramping_vus: {
                 executor: 'ramping-vus',
-                startVUs: ${startVUs},
-                stages:[`;
-                stages.forEach((item,index)=>{
-                    k6Script+=`
-                    {duration:'${item.dur}s', target: ${item.target}}`;
-                    if(index<stages.length-1){
-                        k6Script+=','
-                    }
-                })`],
-
+              startVUs: ${startVUs},
+              gracefulRampDown: '${gracefulRampDown}s',
+            stages: [`;
+          
+          stages.forEach((item, index) => {
+            k6Script += `
+              { duration: '${item.dur}s', target: ${item.target} }`;
+            if (index < stages.length - 1) {
+              k6Script += ',';
             }
-        }`
+          });
+          
+          k6Script += `
+            ]
+          }
+              }`;
+          
     }else if(option==='Constant-arrival-rate'){
         k6Script+=`scenarios:{
-            {
+            constant_arrival_rate: {
                 executor: 'constant-arrival-rate',
                 duration: '${duration}s',
                 rate: ${rate},
-                timeUnit: '${timeUnit}s',
-                prellocatedVUs: ${preAllocatedvus},
+                timeUnit: '${timeUnit}m',
+                preAllocatedVUs: ${preAllocatedvus},
                 maxVUs: ${maxVus},
             },
         },`
     }else if(option==='Ramping-arrival-rate'){
-        k6Script+=`{
+        k6Script+=`
             scenarios: {
+             ramping_arrival_rate: {
                 executor: "ramping-arrival-rate",
                 startRate: ${startRate},
+                timeUnit: '${timeUnit}m',
                 preAllocatedVUS: ${preAllocatedvus},
-                maxVUs: ${maxVus},
-                stages:[`;
-                stages.forEach((item,index)=>{
-                    k6Script+=`
-                    {duration:'${item.dur}s', target: ${item.target}}`;
-                    if(index<stages.length-1){
-                        k6Script+=','
-                    }
-                })`],
+                stages: [`;
+                    stages.forEach((item, index) => {
+                    k6Script += `
+                        { duration: '${item.dur}s', target: ${item.target} }`;
+                        if (index < stages.length - 1) {
+                        k6Script += ',';
+                        }
+                    });
+
+                    k6Script += `
+                ]
             },
         }`
-    }else if(option==='Externally-Controlled'){
-        k6Script+=`{
-            externally_controller-scenario:{
-                executor: 'externally-controlled;,
-                vus: ${numUsers},
-                maxVUs: ${maxVus},
-                duration: '${duration}s'
-            },
-        },`
     }
 
     k6Script += `
@@ -254,7 +260,6 @@ function Webk6() {
     <option class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" value="Ramping-vus">Ramping-VUs</option>
     <option class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" value="Constant-arrival-rate">Constant-Arrival-Rate</option>
     <option class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" value="Ramping-arrival-rate">Ramping-Arrival-Rate</option>
-    <option class="block px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-600 dark:hover:text-white" value="Externally-Controlled">Externally-Controlled</option>
   </select>
 </div>
 
@@ -379,7 +384,7 @@ function Webk6() {
          </div>
          <div className="mb-4">
          <div className='mr-2'>
-         <label htmlFor="numUsers" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-400">StatTime</label>
+         <label htmlFor="numUsers" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-400">MaxDuration:</label>
            <input
              type="number"
              id="StatTime" placeholder='in Seconds'
@@ -387,8 +392,8 @@ function Webk6() {
              name="iterations"
              required
              min="0"
-             value={statTime}
-             onChange={(e) => setstatTime(e.target.value)}
+             value={duration}
+             onChange={(e) => setDuration(e.target.value)}
            />
          </div>
          </div>
@@ -498,6 +503,22 @@ function Webk6() {
            />
          </div>
          </div>
+         <div className="mb-4">
+         <div className='mr-2'>
+         <label htmlFor="gracefulRamp" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-400">Graceful RampDown :</label>
+           <input
+             type="number"
+             id="StatTime" placeholder='rampDown in seconds'
+             className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
+             name="maxDuration"
+             required
+             min="0"
+             value={gracefulRampDown}
+             onChange={(e) => setgracefulRampdown(e.target.value)}
+           />
+         </div>
+         </div>
+         
     <label htmlFor="stages" className="block text-gray-700 font-bold mb-2">Stages:</label>
     {stages.map((item, index) => (
       <div key={index} className="mb-2 flex items-center">
@@ -586,7 +607,7 @@ function Webk6() {
               <input
                 type="number"
                 id="timeUnit"
-                placeholder="In Seconds"
+                placeholder="In minutes"
             className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
                 name="duration"
                 required
@@ -684,21 +705,6 @@ function Webk6() {
            />
          </div>
          </div>
-         <div className="mb-4">
-         <div className='mr-2'>
-         <label htmlFor="maxVus" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-400">Max Vus :</label>
-           <input
-             type="number"
-             id="StatTime" placeholder='Max Users'
-             className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-             name="PreAllocated"
-             required
-             min="0"
-             value={maxVus}
-             onChange={(e) => setmaxVus(e.target.value)}
-           />
-         </div>
-         </div>
          </div>
 
     <label htmlFor="stages" className="block text-gray-700 font-bold mb-2">Stages:</label>
@@ -748,61 +754,9 @@ function Webk6() {
     </button>
   </div>
 )}
-          {option==='Externally-Controlled' &&(
-         <div className="mb-2 flex items-center">
-            <div className="mb-4">
-            <div className='mr-2'>
-            <label htmlFor="numUsers" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-400">No.Of Users:*</label>
-              <input
-                type="number"
-                id="numUsers" placeholder='Concurrent Users'
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                name="numUsers"
-                required
-                min="0"
-                value={numUsers}
-                onChange={(e) => setNumUsers(e.target.value)}
-              />
-            </div>
-            </div>
-
-            <div className="mb-4">
-         <div className='mr-2'>
-         <label htmlFor="numUsers" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-400">Max VUs: :</label>
-           <input
-             type="number"
-             id="StatTime" placeholder='InSeconds'
-             className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-             name="maxDuration"
-             required
-             min="0"
-             value={maxVus}
-             onChange={(e) => setmaxVus(e.target.value)}
-           />
-         </div>
-         </div>
-         
-         <div className="mb-4">
-         <div className='mr-2'>
-         <label htmlFor="numUsers" class="block mb-2 text-sm font-medium text-gray-900 dark:text-gray-400">Duration :</label>
-           <input
-             type="number"
-             id="StatTime" placeholder='InSeconds'
-             className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-             name="maxDuration"
-             required
-             min="0"
-             value={duration}
-             onChange={(e) => setDuration(e.target.value)}
-           />
-         </div>
-         </div>
-
-         </div>
-    )}
 
 
-        <div className="mb-4">
+        {/* <div className="mb-4">
           <label htmlFor="threshold" className="block text-gray-700 font-bold mb-2">Thresholds:</label>
           <select
             id="threshold"
@@ -811,7 +765,7 @@ function Webk6() {
             value={threshold}
             onChange={(e) => setThreshold(e.target.value)}
           >
-            <option value="">Select a threshold option</option>
+            <option value="select threshold">Select a threshold option</option>
             <option value="http_req_duration: ['p(90)<500'],http_req_failed: ['rate<0.01']">
               90% of requests must complete within 500ms and less than 1% of requests can fail
             </option>
@@ -829,7 +783,7 @@ function Webk6() {
             <option value="http_req_failed: ['rate<0.05']">Less than 5% of requests can fail</option>
             <option value="http_req_failed: ['count<10']">No more than 10 requests</option>
           </select>
-        </div>
+        </div> */}
 
         <div className="mb-4">
           <label htmlFor="expectedResponse" className="block text-gray-700 font-bold mb-2">Expected Response:</label>
