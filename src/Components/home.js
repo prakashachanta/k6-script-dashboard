@@ -16,9 +16,15 @@ const Home = () => {
           </Link>
           <Link
             to="/apik6"
-            className="inline-block bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
+            className="inline-block bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded mr-2"
           >
             API
+          </Link>
+          <Link
+            to="/apigroupk6"
+            className="inline-block bg-emerald-600 hover:bg-emerald-600 text-white font-bold py-2 px-4 rounded"
+          >
+            API-Group
           </Link>
         </div>
       </div>
